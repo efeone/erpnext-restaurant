@@ -3,6 +3,7 @@ class PayForm extends DeskForm {
     num_pad = null;
     payment_methods = {};
     dinners = null;
+    other_payment = null;
     form_name = "Payment Order";
     has_primary_action = false;
 
@@ -56,7 +57,6 @@ class PayForm extends DeskForm {
                 this.update_paid_value();
             }
         });
-
         this.get_field("num_pad").$wrapper.empty().append(
             `<div style="width: 100% !important; height: 200px !important; padding: 0">
                 ${this.num_pad.html}
@@ -77,17 +77,34 @@ class PayForm extends DeskForm {
     make_inputs() {
         let payment_methods = "";
         RM.pos_profile.payments.forEach(mode_of_payment => {
-            this.payment_methods[mode_of_payment.mode_of_payment] = frappe.jshtml({
-                tag: "input",
-                properties: {
-                    type: "text",
-                    class: `input-with-feedback form-control bold`
-                },
-            }).on(["change", "keyup"], () => {
+            if (mode_of_payment.default === 1) {
+              this.payment_methods[mode_of_payment.mode_of_payment] = frappe.jshtml({
+                  tag: "input",
+                  properties: {
+                      type: "text",
+                      class: `input-with-feedback form-control bold`,
+                      disabled: 1,
+                  },
+              }).on(["change", "keyup"], () => {
+                  this.update_paid_value();
+              }).on("click", (obj) => {
+                  this.num_pad.input = obj;
+              }).float();
+            }
+            else{
+              this.payment_methods[mode_of_payment.mode_of_payment] = frappe.jshtml({
+                  tag: "input",
+                  properties: {
+                      type: "checkbox",
+                      class: `input-with-feedback form-control`,
+                      id: mode_of_payment.mode_of_payment,
+                  },
+              });
+              this.payment_methods[mode_of_payment.mode_of_payment].on(["change"], () => {
+                this.validate_other_payment_modes(mode_of_payment.mode_of_payment)
                 this.update_paid_value();
-            }).on("click", (obj) => {
-                this.num_pad.input = obj;
-            }).float();
+              });
+            }
 
             if (mode_of_payment.default === 1) {
                 this.payment_methods[mode_of_payment.mode_of_payment].val(this.order.data.amount);
@@ -102,6 +119,22 @@ class PayForm extends DeskForm {
                 mode_of_payment.mode_of_payment, this.payment_methods[mode_of_payment.mode_of_payment]
             );
         });
+
+        this.payment_methods["other_payment"] = frappe.jshtml({
+            tag: "input",
+            properties: {
+                type: "text",
+                class: `input-with-feedback form-control bold`
+            },
+        }).on(["change", "keyup"], () => {
+            this.update_paid_value();
+        }).on("click", (obj) => {
+            this.num_pad.input = obj;
+        }).float();
+
+        payment_methods += this.form_tag (
+            'Other Payment', this.payment_methods['other_payment']
+        );
 
         this.get_field("payment_methods").$wrapper.empty().append(payment_methods);
 
@@ -164,10 +197,19 @@ class PayForm extends DeskForm {
     get payments_values() {
         const payment_values = {};
         RM.pos_profile.payments.forEach((mode_of_payment) => {
+          if(mode_of_payment.default === 1){
             let value = this.payment_methods[mode_of_payment.mode_of_payment].float_val;
             if (value > 0) {
                 payment_values[mode_of_payment.mode_of_payment] = value;
             }
+          }
+          else {
+            let is_enabled = this.payment_methods[mode_of_payment.mode_of_payment].val();
+            let other_payment = this.payment_methods['other_payment'].float_val || 0;
+            if(is_enabled===1) {
+                payment_values[mode_of_payment.mode_of_payment] = other_payment;
+            }
+          }
         });
 
         return payment_values;
@@ -255,14 +297,49 @@ class PayForm extends DeskForm {
 
     update_paid_value() {
         let total = 0;
+        let default_mode_of_payment = "";
+        RM.pos_profile.payments.forEach(mode_of_payment => {
+          if(mode_of_payment.default === 1){
+            default_mode_of_payment = mode_of_payment.mode_of_payment
+          }
+        });
+        if(this.payment_methods['other_payment'].val()){
+          let cash_amount = this.order.data.amount - this.payment_methods['other_payment'].val();
+          if(cash_amount<0){
+            this.payment_methods[default_mode_of_payment].val(this.order.data.amount)
+            this.payment_methods['other_payment'].val(0)
+            frappe.throw('Amount can not be greater than Total Amount!')
+          }
+          if(this.payment_methods[default_mode_of_payment].val() != cash_amount){
+            this.payment_methods[default_mode_of_payment].val(cash_amount)
+          }
+        }
+        else {
+          if(this.payment_methods[default_mode_of_payment].val() != this.order.data.amount){
+            this.payment_methods[default_mode_of_payment].val(this.order.data.amount)
+          }
+        }
 
         setTimeout(() => {
             Object.keys(this.payment_methods).forEach((payment_method) => {
                 total += this.payment_methods[payment_method].float_val;
             });
-
             this.set_value("total_payment", total);
             this.set_value("change_amount", (total - this.order.amount));
         }, 0);
+    }
+
+    validate_other_payment_modes(selected_mode_of_payment) {
+      RM.pos_profile.payments.forEach(mode_of_payment => {
+        let selected_obj = document.getElementById(selected_mode_of_payment)
+        let current_obj = document.getElementById(mode_of_payment.mode_of_payment)
+        if(mode_of_payment.default === 0){
+          this.payment_methods[selected_mode_of_payment].value = 1;
+          if(mode_of_payment.mode_of_payment != selected_mode_of_payment && selected_obj.checked == true){
+            current_obj.checked = false;
+            this.payment_methods[mode_of_payment.mode_of_payment].value = 0;
+          }
+        }
+      });
     }
 }
