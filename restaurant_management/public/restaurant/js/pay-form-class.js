@@ -5,7 +5,7 @@ class PayForm extends DeskForm {
     dinners = null;
     form_name = "Payment Order";
     has_primary_action = false;
-    
+
     constructor(options) {
         super(options);
 
@@ -106,7 +106,7 @@ class PayForm extends DeskForm {
         this.get_field("payment_methods").$wrapper.empty().append(payment_methods);
 
         this.set_dinners_input();
-        
+
         this.update_paid_value();
 
         /*RM.pos_profile.payments.forEach(mode_of_payment => {
@@ -124,7 +124,7 @@ class PayForm extends DeskForm {
         }).on("click", (obj) => {
             this.num_pad.input = obj;
         }).val(this.doc.dinners).int();
-
+        this.dinners.value = 1;
         this.get_field("dinners").$wrapper.empty().append(
             this.form_tag("Dinners", this.dinners)
         );
@@ -205,12 +205,12 @@ class PayForm extends DeskForm {
             },
             always: (r) => {
                 RM.ready();
-                
+
                 if (r.message && r.message.status) {
                     order_manage.clear_current_order();
                     order_manage.check_buttons_status();
                     order_manage.check_item_editor_status();
-                    
+
                     this.hide();
                     this.print(r.message.invoice_name);
                     order_manage.make_orders();
