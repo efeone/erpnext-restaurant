@@ -175,7 +175,7 @@ RestaurantManage = class RestaurantManage {
 			properties: {
 				class: 'btn-default button general-editor-button'
 			},
-			content: `<span class="fa fa-pencil"></span>`
+			content: `<span class="fa fa-pencil general_edit_button"></span>`
 		}).on("click", () => {
 			this.set_edit_status();
 		});
@@ -275,7 +275,7 @@ RestaurantManage = class RestaurantManage {
 
 			frappe.set_route('Form', 'POS Closing Entry', voucher.name);
 		});
-		
+
 	}
 
 	make_rooms() {
@@ -290,14 +290,14 @@ RestaurantManage = class RestaurantManage {
 				this.rooms = r.message;
 				this.render_rooms();
 				this.ready();
-				
+
 				$("body").show();
 				res();
 			});
 		});
 	}
 
-	clear_rooms(currents_rooms = []) {	
+	clear_rooms(currents_rooms = []) {
 		Object.values(this.rooms || {}).forEach(room => {
 			if (!currents_rooms.includes(room.name) || !this.has_access_to_room(room.name)) {
 				this.object(room.name) ? this.object(room.name).remove() : null;
@@ -546,10 +546,14 @@ RestaurantManage = class RestaurantManage {
 		if (this.editing) {
 			this.editing = false;
 			$(".restaurant-manage").removeClass("editing");
+			$(".general_edit_button").addClass("fa fa-pencil");
+			$(".general_edit_button").removeClass("fa-save");
 			this.unselect_all_tables();
 		} else {
 			this.editing = true;
 			$(".restaurant-manage").addClass("editing");
+			$(".general_edit_button").removeClass("fa-pencil");
+			$(".general_edit_button").addClass("fa fa-save");
 			Object.keys(this.components).forEach(k => {
 				this.#components[k].hide();
 			});
