@@ -590,12 +590,16 @@ class TableOrder {
             this[form].reload();
             this[form].show();
         } else {
+          let form_name = `restaurant-order-${type}`;
+          if (form_name=='restaurant-order-customer') {
+            this.select_customer();
+          }
+          else{
             this[form] = new DeskForm({
-                form_name: `restaurant-order-${type}`,
+                form_name: form_name,
                 doc_name: this.data.name,
                 callback: self => {
                     self.hide();
-
                     RM.sound_submit();
                     this.data[type] = self.get_value(type);
                     this.make_invoice();
@@ -606,7 +610,96 @@ class TableOrder {
                     input.set_focus();
                 }
             });
+          }
         }
+    }
+
+    select_customer(){
+      let d = new frappe.ui.Dialog({
+        title: 'Set Customer',
+        fields: [
+          {
+            label: 'Customer',
+            fieldname: 'customer',
+            fieldtype: 'Link',
+            options: 'Customer',
+            reqd: 1,
+            default: this.data.customer
+          },
+          {
+            fieldname: 'custom_html_buttons',
+            fieldtype: 'HTML'
+          },
+          {
+            fieldname: 'table_order',
+            fieldtype: 'Data',
+            default: this.data.name,
+            hidden: 1
+          }
+        ],
+        size: 'large',
+        primary_action_label: 'Submit',
+        primary_action(values) {
+          if(values.customer){
+            update_customer(values.table_order, values.customer)
+          }
+          d.hide();
+        }
+      });
+      d.show();
+      let custom_html_buttons = `
+      <button type="button" class="btn btn-primary btn-sm btn-modal-primary" id="set_default_customer">Set default Customer</button>
+      <button type="button" class="btn btn-primary btn-sm btn-modal-primary" style="margin-left: 20px;" id="new_customer">New Customer</button>
+      `
+      d.fields_dict.custom_html_buttons.$wrapper.empty();
+      d.fields_dict.custom_html_buttons.$wrapper.append(custom_html_buttons);
+      let $wrapper = d.fields_dict.custom_html_buttons.$wrapper;
+      $wrapper.on('click', '#set_default_customer', function () {
+        d.set_values({
+				      'customer': RM.pos_profile.customer
+			   });
+			});
+      $wrapper.on('click', '#new_customer', function () {
+        let dialog = new frappe.ui.Dialog({
+          title: 'Create Customer',
+          fields: [
+            {
+              label: 'Customer',
+              fieldname: 'customer_name',
+              fieldtype: 'Data',
+              reqd: 1,
+            },
+            {
+              fieldname: 'mobile_number',
+              fieldtype: 'Data',
+              options: 'Phone',
+            }
+          ],
+          size: 'large',
+          primary_action_label: 'Create',
+          primary_action(values) {
+            if(values.customer_name){
+              frappe.call({
+                method: 'restaurant_management.restaurant_management.utils.create_new_customer',
+                args: {
+                  customer_name: values.customer_name,
+                  mobile_number: values.mobile_number,
+                },
+                freeze: true,
+                callback: (r) => {
+                  if(r.message){
+                      d.set_values({
+                        'customer': r.message
+                      });
+                  }
+                }
+              });
+            }
+            dialog.hide();
+          }
+        });
+        dialog.show();
+			});
     }
 
     delete_current_item() {
@@ -634,4 +727,18 @@ class TableOrder {
             delete this.items[identifier];
         }
     }
+}
+
+function update_customer(table_order, customer){
+  frappe.call({
+    method: 'restaurant_management.restaurant_management.utils.update_customer_in_table_order',
+    args: {
+      table_order: table_order,
+      customer: customer,
+    },
+    freeze: true,
+    callback: (r) => {
+      RM.objects[table_order].data['customer'] = customer;
+    }
+  });
 }
